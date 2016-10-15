@@ -10,11 +10,7 @@ EFILIB			= /usr/local/lib
 EFI_CRT_OBJS	= $(EFILIB)/crt0-efi-$(ARCH).o
 EFI_LDS			= $(EFILIB)/elf_$(ARCH)_efi.lds
 
-CFLAGS			= $(EFIINCS) -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -Wall 
-ifeq ($(ARCH),x86_64)
-	CFLAGS += -DEFI_FUNCTION_WRAPPER
-endif
-
+CFLAGS			= $(EFIINCS) -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -Wall -DGNU_EFI_USE_MS_ABI
 LDFLAGS			= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L $(EFILIB) -L $(LIB) $(EFI_CRT_OBJS)
 
 all: $(TARGET) copy
