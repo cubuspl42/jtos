@@ -2,60 +2,106 @@
 #include <efilib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <wchar.h>
 
-#define MEMORY_MAP_BUFFER_SIZE 1024 * 1024
+#define MEMORY_MAP_BUFFER_SIZE 512 * 1024 // 1 MiB
 
-EFI_SYSTEM_TABLE *SysTab;
-char MemoryMapBuffer[MEMORY_MAP_BUFFER_SIZE];
+#define PRINT_VAR_U64(x) Print(L ## #x L" = %lx\r\n", (UINT64) x)
 
-static void PrintStatus(EFI_STATUS status)
-{
-    if(status == EFI_SUCCESS) Print(L"EFI_SUCCESS\n\r");
-    else if(status == EFI_BUFFER_TOO_SMALL) Print(L"EFI_BUFFER_TOO_SMALL\n\r");
-    else if(status == EFI_OUT_OF_RESOURCES) Print(L"EFI_OUT_OF_RESOURCES\n\r");
-    else if(status == EFI_INVALID_PARAMETER) Print(L"EFI_INVALID_PARAMETER\n\r");
-    else Print(L"<UNKNOWN EFI ERROR>\n\r");
-}
+EFI_HANDLE IH;
+EFI_SYSTEM_TABLE *ST;
 
-static void PrintMemoryMap(void)
-{
-    UINT64 MemoryMapSize = MEMORY_MAP_BUFFER_SIZE;
+typedef struct {
+    char MemoryMapBuffer[MEMORY_MAP_BUFFER_SIZE];
+    UINT64 MemoryMapSize;
     UINT64 MapKey;
     UINT64 DescriptorSize;
     UINT32 DescriptorVersion;
-    EFI_STATUS status;
-    UINT64 i;
-    char *p;
+} MemoryMap;
 
-    status = SysTab->BootServices->GetMemoryMap(
-        &MemoryMapSize, (EFI_MEMORY_DESCRIPTOR *) MemoryMapBuffer, &MapKey, &DescriptorSize, &DescriptorVersion);
+MemoryMap efi_mm = {0};
 
-    Print(L"DescriptorSize=%ld;sizeof(EFI_MEMORY_DESCRIPTOR)=%d\n\r\n\r", DescriptorSize, sizeof(EFI_MEMORY_DESCRIPTOR));
-    Print(L"MemoryMapSize=%d;MapKey=%d;DescriptorSize=%d;DescriptorVersion=%d\n\r\n\r", MemoryMapSize, MapKey, DescriptorSize, DescriptorVersion);
-
-    p = MemoryMapBuffer;
-    for(i = 0; i < MemoryMapSize; ++i) {
-        const EFI_MEMORY_DESCRIPTOR *Md = (const EFI_MEMORY_DESCRIPTOR *) p;
-        if(Md->PhysicalStart != 0) {
-            Print(L"PS=%lx;VS=%lx;NoP=%ld;EFI_MEMORY_RUNTIME=%d\n\r",
-                Md->PhysicalStart, Md->VirtualStart, Md->NumberOfPages, !!(Md->Attribute & EFI_MEMORY_RUNTIME));
-        }
-        p += DescriptorSize;
+static void PrintStatus(EFI_STATUS status)
+{
+    #define CASE(x) case x: Print(L"status = "  L ## #x "\r\n"); break;
+    switch(status) {
+    CASE(EFI_SUCCESS)
+    CASE(EFI_BUFFER_TOO_SMALL)
+    CASE(EFI_OUT_OF_RESOURCES)
+    CASE(EFI_INVALID_PARAMETER)
+    default: Print(L"status = <unknown>\r\n");
     }
-
-    PrintStatus(status);
+    #undef CASE
 }
 
-EFI_STATUS
-efi_main (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
-    SIMPLE_TEXT_OUTPUT_INTERFACE *ConOut;
+static void AbortBoot(const wchar_t *error, EFI_STATUS status)
+{
+    Print(L"error: %s\r\n", error);
+    PrintStatus(status);
+    Print(L"Aborting boot... \r\n", error);
+    ST->BootServices->Exit(IH, 1, 0, NULL);
+}
 
-    SysTab = SystemTable;
-    ConOut = SystemTable->ConOut;
+static void GetMemoryMap(void)
+{
+    // Print(L"GetMemoryMap...\r\n");
+
+    efi_mm.MemoryMapSize = MEMORY_MAP_BUFFER_SIZE;
+
+    EFI_STATUS status = ST->BootServices->GetMemoryMap(
+        &efi_mm.MemoryMapSize,
+        (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer,
+        &efi_mm.MapKey,
+        &efi_mm.DescriptorSize,
+        &efi_mm.DescriptorVersion);
+
+    // Print(L"MapKey = %lx\r\n", efi_mm.MapKey);
+
+    if(status != EFI_SUCCESS) {
+        AbortBoot(L"GetMemoryMap failed", status);
+    }
+}
+
+static void ExitBootServices()
+{
+    EFI_STATUS status = ST->BootServices->ExitBootServices(IH, efi_mm.MapKey);
+
+    if(status != EFI_SUCCESS) {
+        AbortBoot(L"ExitBootServices failed", status);
+    }
+}
+
+static void RemapMemory(void)
+{
+    EFI_STATUS status = ST->RuntimeServices->SetVirtualAddressMap(
+        efi_mm.MemoryMapSize,
+        efi_mm.DescriptorSize,
+        efi_mm.DescriptorVersion,
+        (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer);
+
+    if(status != EFI_SUCCESS) {
+        AbortBoot(L"SetVirtualAddressMap failed", status);
+    }
+}
+
+static void StartKernel(void)
+{
+    for(;;);
+}
+
+EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
+    IH = ImageHandle;
+    ST = SystemTable;
+
     InitializeLib(ImageHandle, SystemTable);
-    ConOut->OutputString(ConOut, L"jtos 0.0.1 alpha\n\r");
+    Print(L"jtos 0.0.1 alpha\r\n");
+    PRINT_VAR_U64(ImageHandle);
+    PRINT_VAR_U64(SystemTable);
 
-    PrintMemoryMap();
+    GetMemoryMap();
+    ExitBootServices();
+    RemapMemory();
+    StartKernel();
 
     return EFI_SUCCESS;
 }
