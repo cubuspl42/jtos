@@ -1,3 +1,7 @@
+#include "efi.h"
+#include "gfx.h"
+#include "kernel.h"
+
 #include <efi.h>
 #include <efilib.h>
 #include <stdbool.h>
@@ -8,13 +12,14 @@
 
 #define PRINT_U64(x) Print(L ## #x L" = %lx\r\n", (UINT64) x)
 
-EFI_HANDLE IH;
-EFI_SYSTEM_TABLE *ST;
-
-#define KERNEL_PA 0x1000000 // 1MiB
+#define KERNEL_PA 0x100000 // 1MiB
 #define KERNEL_VIRTUAL_BASE 0x8000000000000000 // ~0 / 2
 #define KERNEL_VA (KERNEL_PA + KERNEL_VIRTUAL_BASE)
 #define EFI_VIRTUAL_BASE 0xc000000000000000 // (~0 / 4) * 3
+
+extern char _binary_kernel_img_start;
+extern char _binary_kernel_img_end;
+extern int _binary_kernel_img_size;
 
 typedef struct {
     char MemoryMapBuffer[MEMORY_MAP_BUFFER_SIZE];
@@ -26,25 +31,14 @@ typedef struct {
 
 MemoryMap efi_mm = {0};
 
-static void PrintStatus(EFI_STATUS status)
-{
-    #define CASE(x) case x: Print(L"status = "  L ## #x "\r\n"); break;
-    switch(status) {
-    CASE(EFI_SUCCESS)
-    CASE(EFI_BUFFER_TOO_SMALL)
-    CASE(EFI_OUT_OF_RESOURCES)
-    CASE(EFI_INVALID_PARAMETER)
-    default: Print(L"status = <unknown>\r\n");
-    }
-    #undef CASE
-}
+static void* memcpy(void* dest, const void* src, size_t count) {
+    char* dst8 = (char*)dest;
+    char* src8 = (char*)src;
 
-static void AbortBoot(const wchar_t *error, EFI_STATUS status)
-{
-    Print(L"error: %s\r\n", error);
-    PrintStatus(status);
-    Print(L"Aborting boot... \r\n", error);
-    ST->BootServices->Exit(IH, 1, 0, NULL);
+    while (count--) {
+        *dst8++ = *src8++;
+    }
+    return dest;
 }
 
 static void GetMemoryMap(void)
@@ -53,7 +47,7 @@ static void GetMemoryMap(void)
 
     efi_mm.MemoryMapSize = MEMORY_MAP_BUFFER_SIZE;
 
-    EFI_STATUS status = ST->BootServices->GetMemoryMap(
+    EFI_STATUS status = efi.st->BootServices->GetMemoryMap(
         &efi_mm.MemoryMapSize,
         (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer,
         &efi_mm.MapKey,
@@ -69,7 +63,7 @@ static void GetMemoryMap(void)
 
 static void ExitBootServices()
 {
-    EFI_STATUS status = ST->BootServices->ExitBootServices(IH, efi_mm.MapKey);
+    EFI_STATUS status = ST->BootServices->ExitBootServices(efi.ih, efi_mm.MapKey);
 
     if(status != EFI_SUCCESS) {
         AbortBoot(L"ExitBootServices failed", status);
@@ -80,7 +74,7 @@ static void ExitBootServices()
 
 static void RemapMemory(void)
 {
-    EFI_STATUS status = ST->RuntimeServices->SetVirtualAddressMap(
+    EFI_STATUS status = efi.st->RuntimeServices->SetVirtualAddressMap(
         efi_mm.MemoryMapSize,
         efi_mm.DescriptorSize,
         efi_mm.DescriptorVersion,
@@ -89,31 +83,6 @@ static void RemapMemory(void)
     if(status != EFI_SUCCESS) {
         // AbortBoot(L"SetVirtualAddressMap failed", status);
     }
-}
-
-/* Hardware text mode color constants. */
-enum vga_color {
-    VGA_COLOR_BLACK = 0,
-    VGA_COLOR_BLUE = 1,
-    VGA_COLOR_GREEN = 2,
-    VGA_COLOR_CYAN = 3,
-    VGA_COLOR_RED = 4,
-    VGA_COLOR_MAGENTA = 5,
-    VGA_COLOR_BROWN = 6,
-    VGA_COLOR_LIGHT_GREY = 7,
-    VGA_COLOR_DARK_GREY = 8,
-    VGA_COLOR_LIGHT_BLUE = 9,
-    VGA_COLOR_LIGHT_GREEN = 10,
-    VGA_COLOR_LIGHT_CYAN = 11,
-    VGA_COLOR_LIGHT_RED = 12,
-    VGA_COLOR_LIGHT_MAGENTA = 13,
-    VGA_COLOR_LIGHT_BROWN = 14,
-    VGA_COLOR_WHITE = 15,
-};
-
-static void StartKernel(void)
-{
-    for(;;);
 }
 
 static EFI_MEMORY_DESCRIPTOR *NextMd(EFI_MEMORY_DESCRIPTOR *Md, UINT64 DescriptorSize)
@@ -155,7 +124,7 @@ static void PrintMemoryMap(void)
     EFI_MEMORY_DESCRIPTOR *Md;
     UINT64 i;
 
-    status = ST->BootServices->GetMemoryMap(
+    status = efi.st->BootServices->GetMemoryMap(
         &MemoryMapSize,
         (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer,
         &MapKey,
@@ -181,21 +150,41 @@ static void PrintMemoryMap(void)
     PrintStatus(status);
 }
 
+static void CopyKernelImage(void)
+{
+    size_t count = ((size_t) &_binary_kernel_img_end) - ((size_t) &_binary_kernel_img_start);
+    memcpy((void*) KERNEL_PA, &_binary_kernel_img_start, count);
+}
+
+static void StartKernel(void)
+{
+    KernelStart start = (KernelStart) KERNEL_PA;
+    KernelParams kernel_params;
+    kernel_params.magic = 0xABCD;
+    start(&kernel_params);
+}
+
+static void crash() {
+    typedef void (*F)(void);
+    F f = (F) 0x0;
+    f();
+}
+
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
-    IH = ImageHandle;
-    ST = SystemTable;
+    efi.ih = ImageHandle;
+    efi.st = SystemTable;
 
-    InitializeLib(ImageHandle, SystemTable);
+    InitializeLib(ImageHandle, SystemTable); // Initialize GNU EFI
     Print(L"jtos 0.0.1 alpha\r\n");
-    PRINT_U64(ImageHandle);
-    PRINT_U64(SystemTable);
 
-    // PrintMemoryMap();
+    Gfx gfx;
+    init_gfx(&gfx);
 
-    GetMemoryMap();
-    ExitBootServices();
-    // RemapMemory();
-    StartKernel();
+    // GetMemoryMap();
+    // ExitBootServices();
+
+    // CopyKernelImage();
+    // StartKernel();
 
     return EFI_SUCCESS;
 }
