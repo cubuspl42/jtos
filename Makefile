@@ -21,7 +21,7 @@ LDFLAGS				= -nostdlib
 LDFLAGS				+= $(LDFLAGS-$@)
 LDFLAGS-loader.so	+= -T $(EFI_LDS) -shared -Bsymbolic -L $(EFILIB) -L $(LIB) $(EFI_CRT_OBJS)
 
-all: $(TARGET) copy kernel.text.bin
+all: $(TARGET) copy
 
 kernel.img: head.o kernel.o # make a flat kernel image
 	ld -T kernel.ld -o $@ $^

@@ -10,8 +10,6 @@
 
 #define MEMORY_MAP_BUFFER_SIZE 512 * 1024 // 512 KiB
 
-#define PRINT_U64(x) Print(L ## #x L" = %lx\r\n", (UINT64) x)
-
 #define KERNEL_PA 0x100000 // 1MiB
 #define KERNEL_VIRTUAL_BASE 0x8000000000000000 // ~0 / 2
 #define KERNEL_VA (KERNEL_PA + KERNEL_VIRTUAL_BASE)
@@ -19,17 +17,8 @@
 
 extern char _binary_kernel_img_start;
 extern char _binary_kernel_img_end;
-extern int _binary_kernel_img_size;
 
-typedef struct {
-    char MemoryMapBuffer[MEMORY_MAP_BUFFER_SIZE];
-    UINT64 MemoryMapSize;
-    UINT64 MapKey;
-    UINT64 DescriptorSize;
-    UINT32 DescriptorVersion;
-} MemoryMap;
-
-MemoryMap efi_mm = {0};
+char MemoryMapBuffer[MEMORY_MAP_BUFFER_SIZE];
 
 static void* memcpy(void* dest, const void* src, size_t count) {
     char* dst8 = (char*)dest;
@@ -41,48 +30,51 @@ static void* memcpy(void* dest, const void* src, size_t count) {
     return dest;
 }
 
-static void GetMemoryMap(void)
+void init_gnu_efi(void)
 {
-    Print(L"GetMemoryMap...\r\n");
-
-    efi_mm.MemoryMapSize = MEMORY_MAP_BUFFER_SIZE;
-
-    EFI_STATUS status = efi.st->BootServices->GetMemoryMap(
-        &efi_mm.MemoryMapSize,
-        (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer,
-        &efi_mm.MapKey,
-        &efi_mm.DescriptorSize,
-        &efi_mm.DescriptorVersion);
-
-    // NOTE: From now on, printing makes `MapKey` outdated
-
-    if(status != EFI_SUCCESS) {
-        AbortBoot(L"GetMemoryMap failed", status);
-    }
+    InitializeLib(efi.ih, efi.st);
 }
 
-static void ExitBootServices()
+void init_graphics(Framebuffer *efi_fb)
 {
-    EFI_STATUS status = ST->BootServices->ExitBootServices(efi.ih, efi_mm.MapKey);
+    EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
+    efi.st->BootServices->LocateProtocol(&gop_guid, NULL, (void **) &gop);
+
+    efi_fb->base = (void *) gop->Mode->FrameBufferBase;
+    efi_fb->size = gop->Mode->FrameBufferSize;
+    efi_fb->pitch = gop->Mode->Info->PixelsPerScanLine;
+
+    gop->SetMode(gop, gop->Mode->Mode);
+}
+
+static void get_memory_map(EfiMemoryMap *efi_mm, UINTN *map_key)
+{
+    efi_mm->memory_map_size = MEMORY_MAP_BUFFER_SIZE;
+
+    EFI_STATUS status = efi.st->BootServices->GetMemoryMap(
+        &efi_mm->memory_map_size,
+        (EFI_MEMORY_DESCRIPTOR *) MemoryMapBuffer,
+        map_key,
+        &efi_mm->descriptor_size,
+        &efi_mm->descriptor_version);
+
+    if(status != EFI_SUCCESS) {
+        AbortBoot(L"get_memory_map failed", status);
+    }
+
+    // NOTE: From now on, printing makes `map_key` outdated
+}
+
+static void exit_boot_services(UINTN map_key)
+{
+    EFI_STATUS status = ST->BootServices->ExitBootServices(efi.ih, map_key);
 
     if(status != EFI_SUCCESS) {
         AbortBoot(L"ExitBootServices failed", status);
     }
 
     // NOTE: From now on, printing crashes system (ConOut is NULL)
-}
-
-static void RemapMemory(void)
-{
-    EFI_STATUS status = efi.st->RuntimeServices->SetVirtualAddressMap(
-        efi_mm.MemoryMapSize,
-        efi_mm.DescriptorSize,
-        efi_mm.DescriptorVersion,
-        (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer);
-
-    if(status != EFI_SUCCESS) {
-        // AbortBoot(L"SetVirtualAddressMap failed", status);
-    }
 }
 
 static EFI_MEMORY_DESCRIPTOR *NextMd(EFI_MEMORY_DESCRIPTOR *Md, UINT64 DescriptorSize)
@@ -114,54 +106,10 @@ static void PrintMemoryType(EFI_MEMORY_TYPE t)
 #undef CASE
 }
 
-static void PrintMemoryMap(void)
+static void start_kernel(void *kernel_base, const KernelParams *kernel_params)
 {
-    UINT64 MemoryMapSize = MEMORY_MAP_BUFFER_SIZE;
-    UINT64 MapKey;
-    UINT64 DescriptorSize;
-    UINT32 DescriptorVersion;
-    EFI_STATUS status;
-    EFI_MEMORY_DESCRIPTOR *Md;
-    UINT64 i;
-
-    status = efi.st->BootServices->GetMemoryMap(
-        &MemoryMapSize,
-        (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer,
-        &MapKey,
-        &DescriptorSize,
-        &DescriptorVersion);
-
-    PRINT_U64(MemoryMapSize);
-    PRINT_U64(MapKey);
-    PRINT_U64(DescriptorSize);
-    PRINT_U64(DescriptorVersion);
-
-    MemoryMapSize = 64;
-    Md = (EFI_MEMORY_DESCRIPTOR *) efi_mm.MemoryMapBuffer; 
-    for(i = 0; i < MemoryMapSize; ++i, Md = NextMd(Md, DescriptorSize)) {
-        PrintMemoryType(Md->Type);
-        Print(L";PS=%lx;VS=%lx;NoP=%ld;EMRT=%d\r\n",
-            Md->PhysicalStart,
-            Md->VirtualStart,
-            Md->NumberOfPages,
-            !!(Md->Attribute & EFI_MEMORY_RUNTIME));
-    }
-
-    PrintStatus(status);
-}
-
-static void CopyKernelImage(void)
-{
-    size_t count = ((size_t) &_binary_kernel_img_end) - ((size_t) &_binary_kernel_img_start);
-    memcpy((void*) KERNEL_PA, &_binary_kernel_img_start, count);
-}
-
-static void StartKernel(void)
-{
-    KernelStart start = (KernelStart) KERNEL_PA;
-    KernelParams kernel_params;
-    kernel_params.magic = 0xABCD;
-    start(&kernel_params);
+    KernelStart start = (KernelStart) kernel_base;
+    start(kernel_params);
 }
 
 static void crash() {
@@ -170,21 +118,25 @@ static void crash() {
     f();
 }
 
-EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
-    efi.ih = ImageHandle;
-    efi.st = SystemTable;
+EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
+    efi.ih = image_handle;
+    efi.st = system_table;
 
-    InitializeLib(ImageHandle, SystemTable); // Initialize GNU EFI
-    Print(L"jtos 0.0.1 alpha\r\n");
+    UINTN map_key;
+    KernelParams kernel_params;
+    kernel_params.efi_rts = efi.st->RuntimeServices;
 
-    Gfx gfx;
-    init_gfx(&gfx);
+    void *kernel_base = (void *) KERNEL_PA;
+    const void *kernel_img = (const void *) &_binary_kernel_img_start;
+    size_t kernel_img_size = ((size_t) &_binary_kernel_img_end) - ((size_t) kernel_img);
 
-    // GetMemoryMap();
-    // ExitBootServices();
-
-    // CopyKernelImage();
-    // StartKernel();
+    init_gnu_efi();
+    init_graphics(&kernel_params.efi_fb);
+    get_memory_map(&kernel_params.efi_mm, &map_key);
+    exit_boot_services(map_key);
+    
+    memcpy(kernel_base, kernel_img, kernel_img_size);
+    start_kernel(kernel_base, &kernel_params);
 
     return EFI_SUCCESS;
 }

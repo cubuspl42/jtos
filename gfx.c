@@ -17,11 +17,9 @@ static void* memcpy(void* dest, const void* src, size_t count) {
 
 static void set_pixel(Gfx *gfx, int w, int h, uint32_t rgb)
 {
-    w *= 4;
-    h *= 4;
-    char *framebuffer = (char *) gfx->buffer_base;
-    int32_t *addr = (int32_t *)(framebuffer + w + h * gfx->mode_info.PixelsPerScanLine);
-    *addr = rgb;
+    int32_t *framebuffer = (int32_t *) gfx->buffer_base;
+    int32_t *px = framebuffer + h * gfx->mode_info.PixelsPerScanLine + w;;
+    *px = rgb;
 }
 
 
