@@ -1,7 +1,7 @@
 .section .bss
 .align 16
 stack_bottom:
-.skip 0x4000 # 16 KiB
+.skip 0x80000 # 512 KiB
 stack_top:
 
 .section .head

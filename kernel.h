@@ -1,5 +1,7 @@
 #include <efi.h>
 
+#include "framebuffer.h"
+
 typedef struct {
 	EFI_MEMORY_DESCRIPTOR *memory_map;
 	UINT64 memory_map_size;
@@ -7,12 +9,6 @@ typedef struct {
 	UINT64 descriptor_size;
 	UINT32 descriptor_version;
 } EfiMemoryMap;
-
-typedef struct {
-	void *base;
-	UINT64 size; // in bytes?
-	UINT32 pitch; // pixels per scanlines
-} Framebuffer;
 
 typedef struct {
 	EFI_RUNTIME_SERVICES *efi_rts;

@@ -1,4 +1,6 @@
 #include "kernel.h"
+#include "console.h"
+#include "serial.h"
 
 /* Surely you will remove the processor conditionals and this comment
    appropriately depending on whether or not you use C++. */
@@ -14,28 +16,16 @@ static void crash() {
     f();
 }
 
-static void put_pixel(Framebuffer *fb, int w, int h, uint32_t px)
-{
-    int32_t *fbb = (int32_t *) fb->base;
-    int32_t *pxa = fbb + h * fb->pitch + w;
-    *pxa = px;
-}
+extern char _binary_font_pbm_start;
 
 #if defined(__cplusplus)
 extern "C" /* Use C linkage for kernel_main. */
 #endif
-void kernel_main(KernelParams *kernel_params) {
-	/* Initialize terminal interface */
-	// terminal_initialize();
-
-	/* Newline support is left as an exercise. */
-	// terminal_writestring("Hello, kernel World!\n");
-
-	for(int i = 0; i < 64; ++i)
-		for(int j = 0; j < 64; ++j)
-			put_pixel(&kernel_params->efi_fb, i, j, 0xFFFFFFFF);
-
-	// crash();
+void kernel_main(KernelParams *kernel_params)
+{
+	init_serial();
+	console_init(&kernel_params->efi_fb);
+	console_print("hello, world");
 
 	for(;;);
 }

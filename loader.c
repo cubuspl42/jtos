@@ -1,6 +1,7 @@
 #include "efi.h"
 #include "gfx.h"
 #include "kernel.h"
+#include "serial.h"
 
 #include <efi.h>
 #include <efilib.h>
@@ -42,6 +43,8 @@ void init_graphics(Framebuffer *efi_fb)
     efi.st->BootServices->LocateProtocol(&gop_guid, NULL, (void **) &gop);
 
     efi_fb->base = (void *) gop->Mode->FrameBufferBase;
+    efi_fb->width = gop->Mode->Info->HorizontalResolution;
+    efi_fb->height = gop->Mode->Info->VerticalResolution;
     efi_fb->size = gop->Mode->FrameBufferSize;
     efi_fb->pitch = gop->Mode->Info->PixelsPerScanLine;
 
@@ -77,13 +80,7 @@ static void exit_boot_services(UINTN map_key)
     // NOTE: From now on, printing crashes system (ConOut is NULL)
 }
 
-static EFI_MEMORY_DESCRIPTOR *NextMd(EFI_MEMORY_DESCRIPTOR *Md, UINT64 DescriptorSize)
-{
-    char *p = ((char *) Md) + DescriptorSize;
-    return (EFI_MEMORY_DESCRIPTOR *) p;
-}
-
-static void PrintMemoryType(EFI_MEMORY_TYPE t)
+static void print_memory_type(EFI_MEMORY_TYPE t)
 {
 #define CASE(x) case x: Print(L ## #x); break;
     switch(t) {
@@ -106,16 +103,68 @@ static void PrintMemoryType(EFI_MEMORY_TYPE t)
 #undef CASE
 }
 
-static void start_kernel(void *kernel_base, const KernelParams *kernel_params)
+static EFI_MEMORY_DESCRIPTOR *NextMd(EFI_MEMORY_DESCRIPTOR *Md, UINT64 DescriptorSize)
 {
-    KernelStart start = (KernelStart) kernel_base;
-    start(kernel_params);
+    char *p = ((char *) Md) + DescriptorSize;
+    return (EFI_MEMORY_DESCRIPTOR *) p;
+}
+
+static void print_memory_map(void)
+{
+    static char MemoryMapBuffer[256 * 1024];
+    UINT64 MemoryMapSize = MEMORY_MAP_BUFFER_SIZE;
+    UINT64 MapKey;
+    UINT64 DescriptorSize;
+    UINT32 DescriptorVersion;
+    EFI_STATUS status;
+    EFI_MEMORY_DESCRIPTOR *Md;
+    UINT64 i;
+
+    status = efi.st->BootServices->GetMemoryMap(
+        &MemoryMapSize,
+        (EFI_MEMORY_DESCRIPTOR *) MemoryMapBuffer,
+        &MapKey,
+        &DescriptorSize,
+        &DescriptorVersion);
+
+    // PRINT_U64(MemoryMapSize);
+    // PRINT_U64(MapKey);
+    // PRINT_U64(DescriptorSize);
+    // PRINT_U64(DescriptorVersion);
+
+    MemoryMapSize = 64;
+    Md = (EFI_MEMORY_DESCRIPTOR *) MemoryMapBuffer; 
+    for(i = 0; i < MemoryMapSize; ++i, Md = NextMd(Md, DescriptorSize)) {
+        print_memory_type(Md->Type);
+        Print(L";PS=%lx;VS=%lx;NoP=%ld;EMRT=%d\r\n",
+            Md->PhysicalStart,
+            Md->VirtualStart,
+            Md->NumberOfPages,
+            !!(Md->Attribute & EFI_MEMORY_RUNTIME));
+    }
+
+    PrintStatus(status);
 }
 
 static void crash() {
     typedef void (*F)(void);
     F f = (F) 0x0;
     f();
+}
+
+static void start_kernel(void *kernel_base, const KernelParams *kernel_params)
+{
+    KernelStart start = (KernelStart) kernel_base;
+    start(kernel_params);
+}
+
+static void serial_print_mem(const void *mem, int n) {
+    const char *memc = (const char *) mem;
+    for(int i = 0; i < n; ++i) {
+        serial_print_hex(memc[i]);
+        serial_print(":");
+    }
+    serial_print("\r\n");
 }
 
 EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
@@ -126,15 +175,20 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
     KernelParams kernel_params;
     kernel_params.efi_rts = efi.st->RuntimeServices;
 
+    init_serial();
+
     void *kernel_base = (void *) KERNEL_PA;
     const void *kernel_img = (const void *) &_binary_kernel_img_start;
     size_t kernel_img_size = ((size_t) &_binary_kernel_img_end) - ((size_t) kernel_img);
 
     init_gnu_efi();
+
+    // print_memory_map();
+
     init_graphics(&kernel_params.efi_fb);
     get_memory_map(&kernel_params.efi_mm, &map_key);
     exit_boot_services(map_key);
-    
+
     memcpy(kernel_base, kernel_img, kernel_img_size);
     start_kernel(kernel_base, &kernel_params);
 

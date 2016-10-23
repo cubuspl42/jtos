@@ -12,24 +12,30 @@ EFI_CRT_OBJS	= $(EFILIB)/crt0-efi-$(ARCH).o
 EFI_LDS			= $(EFILIB)/elf_$(ARCH)_efi.lds
 CC				= /usr/bin/clang
 
-CFLAGS				= -xc -std=gnu11 -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -Wall -Wextra -pedantic-errors
+CFLAGS				= -O0 -xc -std=gnu11 -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -Wall -Wextra -pedantic-errors
 CFLAGS				+= $(CFLAGS-$@) $(EFIINCS)
 CFLAGS-efi.o		+= -DGNU_EFI_USE_MS_ABI
 CFLAGS-loader.o		+= -DGNU_EFI_USE_MS_ABI
 CFLAGS-gfx.o		+= -DGNU_EFI_USE_MS_ABI
-LDFLAGS				= -nostdlib
+LDFLAGS				= -nostdlib -znocombreloc
 LDFLAGS				+= $(LDFLAGS-$@)
 LDFLAGS-loader.so	+= -T $(EFI_LDS) -shared -Bsymbolic -L $(EFILIB) -L $(LIB) $(EFI_CRT_OBJS)
 
 all: $(TARGET) copy
 
-kernel.img: head.o kernel.o # make a flat kernel image
-	ld -T kernel.ld -o $@ $^
-
-kernelimg.o: kernel.img # wrap flat kernel image into an object
+fontppm.o: font.ppm
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-loader.so: efi.o gfx.o loader.o kernelimg.o # inject kernel image into bootloader
+kernel.elf.img: head.o kernel.o serial.o fontppm.o console.o
+	ld -T kernel.ld -o $@ $^
+
+kernel.img: kernel.elf.img
+	objcopy -O binary $^ $@
+
+kernelimg.o: kernel.img
+	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
+
+loader.so: efi.o gfx.o loader.o serial.o kernelimg.o
 	ld $(LDFLAGS) $^ -o $@ -lefi -lgnuefi
 
 %.efi: %.so
