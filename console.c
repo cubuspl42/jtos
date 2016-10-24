@@ -22,6 +22,9 @@ extern char _binary_font_ppm_start;
 extern char _binary_font_ppm_end;
 static Framebuffer *framebuffer;
 static Pixmap fontbm;
+static int console_i = 0;
+static int console_j = 0;
+static int console_h = 0;
 
 static uint32_t bmpx(const Pixmap *bm, int x, int y)
 {
@@ -56,12 +59,12 @@ static void blt(int dx, int dy, int sx, int sy, int sw, int sh, const Pixmap *bm
 	for(int i = 0; i < sh; ++i) {
 		for(int j = 0; j < sw; ++j) {
 			uint32_t px = bmpx(bm, sx + j, sy + i);
-			putpx(dx + j, dy + i, px);
+			sputpx(dx + j, dy + i, px);
 		}
 	}
 }
 
-static void print_char(int dx, int dy, uint8_t c) {
+static void blt_char(int dx, int dy, uint8_t c) {
 	int i = c / FONT_MATRIX_WIDTH;
 	int j = c % FONT_MATRIX_HEIGHT;
 	int ipx = i * FONT_CHAR_HEIGHT;
@@ -69,22 +72,32 @@ static void print_char(int dx, int dy, uint8_t c) {
 	blt(dx, dy, jpx, ipx, FONT_CHAR_WIDTH, FONT_CHAR_HEIGHT, &fontbm);
 }
 
+static void print_char(uint8_t c) {
+	if(c == '\n') {
+		console_i = (console_i + 1) % console_h;
+		console_j = 0;
+	} else {
+		blt_char(console_j * FONT_CHAR_WIDTH, console_i * FONT_CHAR_HEIGHT, c);
+		++console_j;
+	}
+}
+
 void console_init(Framebuffer *_framebuffer)
 {
 	framebuffer = _framebuffer;
 
-	SERIAL_DUMP_HEX(framebuffer);
-	SERIAL_DUMP_HEX(_framebuffer);
-
 	fontbm.buffer = (uint8_t *)(&_binary_font_ppm_start + FONT_PPM_HEADER_SIZE);
 	fontbm.width = FONT_PPM_WIDTH;
 	fontbm.height = FONT_PPM_HEIGHT;
+
+	console_h = framebuffer->height / FONT_CHAR_HEIGHT;
 }
 
 void console_print(const char *str)
 {
 	const uint8_t *p = (const uint8_t *) str;
-	for(int i = 0; *p; ++i, ++p) {
-		print_char(i * FONT_CHAR_WIDTH, 0, *p);
+	while(*p) {
+		print_char(*p);
+		++p;
 	}
 }
