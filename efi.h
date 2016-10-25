@@ -18,3 +18,11 @@ do { \
 	Print(L ## #expr L"\r\n"); \
 	PrintStatus(__status); \
 } while(0)
+
+static const EFI_MEMORY_DESCRIPTOR *next_md(
+	const EFI_MEMORY_DESCRIPTOR *Md, UINT64 DescriptorSize)
+{
+	const char *p = ((const char *) Md) + DescriptorSize;
+	return (const EFI_MEMORY_DESCRIPTOR *) p;
+}
+

@@ -11,11 +11,6 @@
 
 #define MEMORY_MAP_BUFFER_SIZE 512 * 1024 // 512 KiB
 
-#define KERNEL_PA 0x100000 // 1MiB
-#define KERNEL_VIRTUAL_BASE 0x8000000000000000 // ~0 / 2
-#define KERNEL_VA (KERNEL_PA + KERNEL_VIRTUAL_BASE)
-#define EFI_VIRTUAL_BASE 0xc000000000000000 // (~0 / 4) * 3
-
 extern char _binary_kernel_img_start;
 extern char _binary_kernel_img_end;
 
@@ -36,28 +31,29 @@ void init_gnu_efi(void)
     InitializeLib(efi.ih, efi.st);
 }
 
-void init_graphics(Framebuffer *efi_fb)
+void init_graphics(Framebuffer *fb)
 {
     EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
     efi.st->BootServices->LocateProtocol(&gop_guid, NULL, (void **) &gop);
 
-    efi_fb->base = (void *) gop->Mode->FrameBufferBase;
-    efi_fb->width = gop->Mode->Info->HorizontalResolution;
-    efi_fb->height = gop->Mode->Info->VerticalResolution;
-    efi_fb->size = gop->Mode->FrameBufferSize;
-    efi_fb->pitch = gop->Mode->Info->PixelsPerScanLine;
+    fb->base = (void *) gop->Mode->FrameBufferBase;
+    fb->width = gop->Mode->Info->HorizontalResolution;
+    fb->height = gop->Mode->Info->VerticalResolution;
+    fb->size = gop->Mode->FrameBufferSize;
+    fb->pitch = gop->Mode->Info->PixelsPerScanLine;
 
     gop->SetMode(gop, gop->Mode->Mode);
 }
 
 static void get_memory_map(EfiMemoryMap *efi_mm, UINTN *map_key)
 {
+    efi_mm->memory_map = (EFI_MEMORY_DESCRIPTOR *) MemoryMapBuffer;
     efi_mm->memory_map_size = MEMORY_MAP_BUFFER_SIZE;
 
     EFI_STATUS status = efi.st->BootServices->GetMemoryMap(
         &efi_mm->memory_map_size,
-        (EFI_MEMORY_DESCRIPTOR *) MemoryMapBuffer,
+        efi_mm->memory_map,
         map_key,
         &efi_mm->descriptor_size,
         &efi_mm->descriptor_version);
@@ -185,7 +181,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
 
     // print_memory_map();
 
-    init_graphics(&kernel_params.efi_fb);
+    init_graphics(&kernel_params.fb);
     get_memory_map(&kernel_params.efi_mm, &map_key);
     exit_boot_services(map_key);
 
