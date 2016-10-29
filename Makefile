@@ -26,7 +26,7 @@ all: $(TARGET) copy
 fontppm.o: font.ppm
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-kernel.elf.img: common.o head.o kernel.o serial.o fontppm.o console.o paging.o pagealloc.o
+kernel.elf.img: common.o head.o kernel.o serial.o fontppm.o console.o
 	ld -T kernel.ld -o $@ $^
 
 kernel.img: kernel.elf.img
@@ -35,7 +35,7 @@ kernel.img: kernel.elf.img
 kernelimg.o: kernel.img
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-loader.so: efi.o gfx.o loader.o serial.o kernelimg.o
+loader.so: efi.o gfx.o loader.o serial.o kernelimg.o paging.o pagealloc.o
 	ld $(LDFLAGS) $^ -o $@ -lefi -lgnuefi
 
 %.efi: %.so

@@ -2,6 +2,7 @@
 #include "gfx.h"
 #include "kernel.h"
 #include "serial.h"
+#include "paging.h"
 
 #include <efi.h>
 #include <efilib.h>
@@ -148,9 +149,9 @@ static void crash() {
     f();
 }
 
-static void start_kernel(void *kernel_base, const KernelParams *kernel_params)
+static void start_kernel(uint64_t kernel_va, const KernelParams *kernel_params)
 {
-    KernelStart start = (KernelStart) kernel_base;
+    KernelStart start = (KernelStart) kernel_va;
     start(kernel_params);
 }
 
@@ -163,30 +164,36 @@ static void serial_print_mem(const void *mem, int n) {
     serial_print("\r\n");
 }
 
-EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
+static void copy_kernel(
+    uint64_t kernel_pa, const void *kernel_img, size_t kernel_img_size)
+{
+    memcpy((void *) kernel_pa, kernel_img, kernel_img_size);
+}
+
+EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
+{
     efi.ih = image_handle;
     efi.st = system_table;
 
     UINTN map_key;
     KernelParams kernel_params;
     kernel_params.efi_rts = efi.st->RuntimeServices;
-
-    init_serial();
-
-    void *kernel_base = (void *) KERNEL_PA;
     const void *kernel_img = (const void *) &_binary_kernel_img_start;
     size_t kernel_img_size = ((size_t) &_binary_kernel_img_end) - ((size_t) kernel_img);
 
+    init_serial();
     init_gnu_efi();
-
-    // print_memory_map();
-
     init_graphics(&kernel_params.fb);
     get_memory_map(&kernel_params.efi_mm, &map_key);
     exit_boot_services(map_key);
 
-    memcpy(kernel_base, kernel_img, kernel_img_size);
-    start_kernel(kernel_base, &kernel_params);
+    copy_kernel(KERNEL_PA, kernel_img, kernel_img_size);
+
+    // get_loader_regions(); // to unmap later
+    setup_paging(&kernel_params.efi_mm, &kernel_params.fb, KERNEL_VA, KERNEL_PA);
+
+    serial_print("start_kernel...\r\n");
+    start_kernel(KERNEL_VA, &kernel_params);
 
     return EFI_SUCCESS;
 }

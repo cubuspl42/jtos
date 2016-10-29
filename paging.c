@@ -118,13 +118,20 @@ static void init_pe(Pe *pe, uint64_t ppa)
 
 // get page map
 static void * get_pm(Pe *pt, uint64_t pi) {
+	serial_print("> get_pm\r\n");
 	Pe *pe = &pt[pi];
 	if(pe->p == 0) {
+		serial_print("pgalloc (\r\n");
 		void *page = pgalloc();
+		serial_print("pgalloc )\r\n");
 		init_pe(pe, (uint64_t) page);
+
+		serial_print("< get_pm\r\n");
 		return page;
 	} else {
 		void *page = (void *)(pe->phy << PAGE_SIZE_BITS);
+
+		serial_print("< get_pm\r\n");
 		return page;
 	}
 }
@@ -151,12 +158,15 @@ static void map_page_pdpt(Pe pdpt[], uint64_t vpa, uint64_t ppa)
 
 static void map_page_pml4(Pe pml4[], uint64_t vpa, uint64_t ppa)
 {
+	serial_print("> map_page_pml4\r\n");
 	void *pdpt = get_pm(pml4, linaddr(vpa).pml4);
 	map_page_pdpt(pdpt, vpa, ppa);
+	serial_print("< map_page_pml4\r\n");
 }
 
 static void map_region(uint64_t vra, uint64_t pra, int np)
 {
+	serial_print("> map_region\r\n");
 	// kassert(vra & OFFSET_MASK == 0)
 	// kassert(pra & OFFSET_MASK == 0)
 
@@ -164,34 +174,73 @@ static void map_region(uint64_t vra, uint64_t pra, int np)
 	for(; vra < vrae; vra += PAGE_SIZE, pra += PAGE_SIZE) {
 		map_page_pml4(pml4, vra, pra);
 	}
+
+	serial_print("< map_region\r\n");
 }
 
-static void trigger_paging()
+static void map_region_id(uint64_t a, int np)
+{
+	serial_print("> map_region_id\r\n");
+	map_region(a, a, np);
+	serial_print("< map_region_id\r\n");
+}
+
+static void enable_paging()
 {
 	write_cr3((uint64_t) pml4);
 }
 
-static void map_efi_runtime(EfiMemoryMap *mm)
+static void map_efi_regions(EfiMemoryMap *mm)
 {
+	serial_print("> map_efi_regions\r\n");
 	const EFI_MEMORY_DESCRIPTOR *md = mm->memory_map;
 	const UINT64 ds = mm->descriptor_size;
 	for(int i = 0; i < (int) mm->memory_map_size; ++i, md = next_md(md, ds)) {
 		if(md->Attribute & EFI_MEMORY_RUNTIME) {
-			map_region(md->PhysicalStart, md->PhysicalStart, md->NumberOfPages);
+			map_region_id(md->PhysicalStart, md->NumberOfPages); // TODO: no id
+		} else if(md->Type == EfiLoaderCode) {
+			map_region_id(md->PhysicalStart, md->NumberOfPages);
+		} else if(md->Type == EfiLoaderData) {
+			map_region_id(md->PhysicalStart, md->NumberOfPages);
 		}
 	}
+	serial_print("< map_efi_regions\r\n");
 }
 
 static void map_framebuffer(Framebuffer *fb)
 {
+	serial_print("> map_framebuffer\r\n");
 	uint64_t fbb = (uint64_t) fb->base;
-	map_region(fbb, fbb, fb->size / PAGE_SIZE + 1);
+	map_region_id(fbb, fb->size / PAGE_SIZE + 1);
+	serial_print("< map_framebuffer\r\n");
 }
 
-void enable_paging(EfiMemoryMap *mm, Framebuffer *fb)
+static void map_kernel(
+	uint64_t kernel_va, uint64_t kernel_pa, uint64_t kernel_size)
 {
-	map_region(KERNEL_PA, KERNEL_PA, 256);
-	map_efi_runtime(mm);
-	map_framebuffer(fb);
-	trigger_paging();
+	serial_print(">>>>>>>>>>>>>>>>>>>>>>>> map_kernel\r\n");
+	map_region(kernel_va, kernel_pa, kernel_size >> PAGE_SIZE_BITS);
+	serial_print("<<<<<<<<<<<<<<<<<<<<<<<< map_kernel\r\n");
+}
+
+void *memset(void *dest, int e, unsigned long len) {
+    uint8_t *d = dest;
+    for(uint64_t i = 0; i < len; i++, d++) {
+        *d = e;
+    }
+    return dest;
+}
+
+void setup_paging(
+	EfiMemoryMap *mm, Framebuffer *fb, uint64_t kernel_pa, uint64_t kernel_va)
+{
+	memset(pml4, 0, sizeof(pml4));
+	
+	const size_t kernel_est_size = 1024 * 1024; // HACK: img size + ~.bss
+	// map_kernel(kernel_va, kernel_pa, kernel_est_size);
+	map_efi_regions(mm);
+	// map_framebuffer(fb);
+	serial_print("enable_paging (\r\n");
+	enable_paging();
+	serial_print("enable_paging )\r\n");
 }
