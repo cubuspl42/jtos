@@ -229,3 +229,8 @@ void serial_print_hex(uint64_t n) {
     } while (n != 0);
     serial_port_write((uint8_t *)buf, 16);
 }
+
+void serial_print_ptr(void *ptr)
+{
+    serial_print_hex((uint64_t) ptr);
+}

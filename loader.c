@@ -179,13 +179,18 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
 
     init_gnu_efi();
 
-    // print_memory_map();
+    void *stack = &map_key;
+    SERIAL_DUMP_HEX(stack);
+    print_memory_map();
 
     init_graphics(&kernel_params.fb);
     get_memory_map(&kernel_params.efi_mm, &map_key);
     exit_boot_services(map_key);
 
+    enable_paging(&kernel_params.efi_mm, &kernel_params.fb);
+
     memcpy(kernel_base, kernel_img, kernel_img_size);
+    serial_print("start_kernel ->\r\n");
     start_kernel(kernel_base, &kernel_params);
 
     return EFI_SUCCESS;

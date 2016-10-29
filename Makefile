@@ -12,7 +12,7 @@ EFI_CRT_OBJS	= $(EFILIB)/crt0-efi-$(ARCH).o
 EFI_LDS			= $(EFILIB)/elf_$(ARCH)_efi.lds
 CC				= /usr/bin/clang
 
-CFLAGS				= -O0 -xc -std=gnu11 -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -Wall -Wextra -pedantic-errors -DGNU_EFI_USE_MS_ABI
+CFLAGS				= -O0 -xc -std=gnu11 -fno-stack-protector -fpic -fshort-wchar -mno-red-zone -Wall -Wextra -DGNU_EFI_USE_MS_ABI
 CFLAGS				+= $(CFLAGS-$@) $(EFIINCS)
 CFLAGS-efi.o		+= -DGNU_EFI_USE_MS_ABI
 CFLAGS-loader.o		+= -DGNU_EFI_USE_MS_ABI
@@ -26,7 +26,7 @@ all: $(TARGET) copy
 fontppm.o: font.ppm
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-kernel.elf.img: common.o head.o kernel.o serial.o fontppm.o console.o paging.o pagealloc.o
+kernel.elf.img: common.o head.o kernel.o serial.o fontppm.o console.o
 	ld -T kernel.ld -o $@ $^
 
 kernel.img: kernel.elf.img
@@ -35,7 +35,7 @@ kernel.img: kernel.elf.img
 kernelimg.o: kernel.img
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-loader.so: efi.o gfx.o loader.o serial.o kernelimg.o
+loader.so: efi.o gfx.o loader.o serial.o paging.o pagealloc.o kernelimg.o
 	ld $(LDFLAGS) $^ -o $@ -lefi -lgnuefi
 
 %.efi: %.so

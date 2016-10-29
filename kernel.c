@@ -39,13 +39,14 @@ static void print_time(EFI_RUNTIME_SERVICES *rts)
 
 void kernel_main(KernelParams *_params)
 {
+	serial_print("> kernel_main\r\n");
 	KernelParams params = *_params;
 
 	init_serial();
 	console_init(&params.fb);
 	console_print("### jtos 0.0.1 alpha ###\n");
 
-	enable_paging(&params.efi_mm, &params.fb);
+	// enable_paging(&params.efi_mm, &params.fb);
 	console_print("* enabled paging\n");
 
 	print_time(params.efi_rts);
