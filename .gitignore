@@ -3,4 +3,5 @@
 *.efi
 *.bin
 *.img
+*.swp
 hda/

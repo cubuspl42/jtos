@@ -10,6 +10,7 @@ void PrintStatus(EFI_STATUS status)
     CASE(EFI_BUFFER_TOO_SMALL)
     CASE(EFI_OUT_OF_RESOURCES)
     CASE(EFI_INVALID_PARAMETER)
+    CASE(EFI_NOT_FOUND)
     default: Print(L"status = <unknown>\r\n");
     }
     #undef CASE
