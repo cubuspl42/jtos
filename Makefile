@@ -26,16 +26,25 @@ all: disk.img
 fontppm.o: font.ppm
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-kernel.elf.img: common.o head.o kernel.o serial.o fontppm.o console.o paging.o pagealloc.o
-	ld -T kernel.ld -o $@ $^
+kernel1.elf.img: head1.o common.o kernel.o serial.o fontppm.o console.o
+	ld -T kernel1.ld -o $@ $^
 
-kernel.img: kernel.elf.img
+kernel1.img: kernel1.elf.img
 	objcopy -O binary $^ $@
 
-kernelimg.o: kernel.img
+kernel1img.o: kernel1.img
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-loader.so: efi.o gfx.o loader.o serial.o kernelimg.o
+kernel0.elf.img: head0.o common.o serial.o paging.o pagealloc.o start0.o kernel1img.o
+	ld -T kernel0.ld -o $@ $^
+
+kernel0.img: kernel0.elf.img
+	objcopy -O binary $^ $@
+
+kernel0img.o: kernel0.img
+	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
+
+loader.so: efi.o gfx.o loader.o serial.o kernel0img.o
 	ld $(LDFLAGS) $^ -o $@ -lefi -lgnuefi
 
 %.efi: %.so

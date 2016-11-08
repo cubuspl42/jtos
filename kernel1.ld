@@ -1,9 +1,10 @@
 SECTIONS
 {
+	/* . = 0xc000000000000000; */
 	. = 0x100000;
 	.text :
 	{
-		*(.head)
+		*(.head1)
 		*(.text)
 	}
 	.data :

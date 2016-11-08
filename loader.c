@@ -11,8 +11,8 @@
 
 #define MEMORY_MAP_BUFFER_SIZE 512 * 1024 // 512 KiB
 
-extern char _binary_kernel_img_start;
-extern char _binary_kernel_img_end;
+extern char _binary_kernel0_img_start;
+extern char _binary_kernel0_img_end;
 
 char MemoryMapBuffer[MEMORY_MAP_BUFFER_SIZE];
 
@@ -148,10 +148,10 @@ static void crash() {
     f();
 }
 
-static void start_kernel(void *kernel_base, const KernelParams *kernel_params)
+static void start_kernel0(void *kernel_base, const KernelParams *params)
 {
     KernelStart start = (KernelStart) kernel_base;
-    start(kernel_params);
+    start(params);
 }
 
 static void serial_print_mem(const void *mem, int n) {
@@ -168,25 +168,25 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
     efi.st = system_table;
 
     UINTN map_key;
-    KernelParams kernel_params;
-    kernel_params.efi_rts = efi.st->RuntimeServices;
+    KernelParams params;
+    params.efi_rts = efi.st->RuntimeServices;
 
     init_serial();
 
     void *kernel_base = (void *) KERNEL_PA;
-    const void *kernel_img = (const void *) &_binary_kernel_img_start;
-    size_t kernel_img_size = ((size_t) &_binary_kernel_img_end) - ((size_t) kernel_img);
+    const void *kernel0_img = (const void *) &_binary_kernel0_img_start;
+    size_t kernel0_img_size = ((size_t) &_binary_kernel0_img_end) - ((size_t) kernel0_img);
 
     init_gnu_efi();
 
     // print_memory_map();
 
-    init_graphics(&kernel_params.fb);
-    get_memory_map(&kernel_params.efi_mm, &map_key);
+    init_graphics(&params.fb);
+    get_memory_map(&params.efi_mm, &map_key);
     exit_boot_services(map_key);
 
-    memcpy(kernel_base, kernel_img, kernel_img_size);
-    start_kernel(kernel_base, &kernel_params);
+    memcpy(kernel_base, kernel0_img, kernel0_img_size);
+    start_kernel0(kernel_base, &params);
 
     return EFI_SUCCESS;
 }
