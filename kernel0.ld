@@ -6,13 +6,14 @@ SECTIONS
 		*(.head0)
 		*(.text)
 	}
-	.data :
+	.data : ALIGN(0x1000)
 	{
 		*(.data)
 	}
 	.bss :
 	{
-		*(.stack)
+		*(.stack0)
 		*(.bss)
+		_kernel0_end = .;
 	}
 }

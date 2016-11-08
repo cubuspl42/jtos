@@ -229,3 +229,31 @@ void serial_print_hex(uint64_t n) {
     } while (n != 0);
     serial_port_write((uint8_t *)buf, 16);
 }
+
+void serial_print_mem(const void *mem, int n)
+{
+    serial_print("@");
+    serial_print_hex((uint64_t) mem);
+    serial_print("\r\n");
+    const unsigned char *memc = (const unsigned char *) mem;
+    for(int i = 0; i < n; ++i) {
+        if(i) serial_print(":");
+        serial_print_hex(memc[i]);
+    }
+    serial_print("\r\n");
+}
+
+void serial_print_ptr(void *ptr)
+{
+    serial_print_hex((uint64_t) ptr);
+}
+
+void serial_print_bits(uint64_t value)
+{
+    for(int i = 0; i < 64; ++i) {
+        if(value & (1ull << i)) {
+            serial_print_int(i);
+            serial_print(";");
+        }
+    }
+}

@@ -37,18 +37,30 @@ static void print_time(EFI_RUNTIME_SERVICES *rts)
 	}
 }
 
-void kernel_main(KernelParams *_params)
-{
-	KernelParams params = *_params;
+static void crash() {
+    typedef void (*F)(void);
+    F f = (F) 0x0;
+    f();
+}
 
-	init_serial();
-	console_init(&params.fb);
-	console_print("### jtos 0.0.1 alpha ###\n");
+void kernel_start1(KernelParams *_params)
+{
+	serial_print("> kernel_start1\r\n");
+	// KernelParams params = *_params;
+
+	// crash();
+
+	// for(;;);
+	// serial_print("> kernel_start1\r\n");
+
+	// init_serial();
+	// console_init(&params.fb);
+	// console_print("### jtos 0.0.1 alpha ###\n");
 
 	// enable_paging(&params.efi_mm, &params.fb);
-	console_print("* enabled paging\n");
+	// console_print("* enabled paging\n");
 
-	print_time(params.efi_rts);
+	// print_time(params.efi_rts);
 
 	for(;;);
 }

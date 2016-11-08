@@ -161,6 +161,13 @@ static void map_region(uint64_t vra, uint64_t pra, int np)
 	// kassert(pra & OFFSET_MASK == 0)
 
 	uint64_t vrae = vra + np * PAGE_SIZE; // virtual address end
+
+	serial_print("> map_region\r\n");
+	SERIAL_DUMP_HEX(vra);
+	SERIAL_DUMP_HEX(pra);
+	SERIAL_DUMP_HEX(np);
+	SERIAL_DUMP_HEX(vrae);
+
 	for(; vra < vrae; vra += PAGE_SIZE, pra += PAGE_SIZE) {
 		map_page_pml4(pml4, vra, pra);
 	}
@@ -185,13 +192,105 @@ static void map_efi_runtime(EfiMemoryMap *mm)
 static void map_framebuffer(Framebuffer *fb)
 {
 	uint64_t fbb = (uint64_t) fb->base;
-	map_region(fbb, fbb, fb->size / PAGE_SIZE + 1);
+	map_region(FRAMEBUFFER_VIRTUAL_BASE, fbb, fb->size / PAGE_SIZE + 1);
 }
 
-void enable_paging(EfiMemoryMap *mm, Framebuffer *fb)
+static void ind(int ilv)
+{
+	for(int i = 0; i < ilv; ++i) {
+		serial_print("    ");
+	}
+}
+
+static void indlv(int lv)
+{
+	int i = 4 - lv;
+	ind(i);
+}
+
+static void sp(void)
+{
+	serial_print(" ");
+}
+
+static void print_pe(Pe *pe, int i, int lv);
+
+static void print_n(int lv, int *n) {
+	if(*n) {
+		int i = 4 - lv;
+		ind(i);
+		serial_print("[");
+		serial_print_int(*n);
+		serial_print("]\r\n");
+		*n = 0;
+	}
+}
+
+static void print_pm(Pe pm[], int lv) {
+	indlv(lv);
+	switch(lv) {
+		case 4: serial_print("PML4"); break;
+		case 3: serial_print("PDPT"); break;
+		case 2: serial_print("__PD"); break;
+		case 1: serial_print("__PT"); break;
+		case 0: serial_print("PAGE"); break;
+	}
+	serial_print("#");
+	serial_print_ptr(pm);
+	serial_print("\r\n");
+
+	int n = 0;
+	for(int i = 0; i < PAGE_TABLE_SIZE; ++i) {
+		Pe *pe = &pm[i];
+		if(pe->p) {
+			print_n(lv, &n);
+			print_pe(&pm[i], i, lv);
+		} else {
+			++n;
+		}
+	}
+	print_n(lv, &n);
+}
+
+static void print_pe(Pe *pe, int i, int lv)
+{
+	if(pe->p) {
+		indlv(lv);
+
+		serial_print("(");
+		serial_print_int(i);
+		serial_print(") ");
+
+		switch(lv) {
+			case 4: serial_print("PML4e"); break;
+			case 3: serial_print("PDPTe"); break;
+			case 2: serial_print("__PDe"); break;
+			case 1: serial_print("__PTe"); break;
+			case 0: serial_print("PAGEe"); break;
+		}
+		serial_print("@");
+		serial_print_ptr(pe);
+		serial_print(" ");
+
+		SERIAL_DUMP_HEX(pe->phy);
+	} else {
+		serial_print(".");
+	}
+	#if 1
+	if(pe->p && lv > 1) {
+		Pe *pm = (Pe *)(pe->phy << PAGE_SIZE_BITS);
+		print_pm(pm, lv - 1);
+	}
+	#endif
+}
+
+
+void enable_paging(void *kernel_hh_pa, EfiMemoryMap *mm, Framebuffer *fb)
 {
 	map_region(KERNEL_PA, KERNEL_PA, 256);
-	map_efi_runtime(mm);
-	map_framebuffer(fb);
+	map_region(KERNEL_VIRTUAL_BASE, (uint64_t) kernel_hh_pa, 256);
+	// map_efi_runtime(mm);
+	// map_framebuffer(fb);
+	// print_pm(pml4, 4);
 	trigger_paging();
 }

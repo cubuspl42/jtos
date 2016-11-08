@@ -154,15 +154,6 @@ static void start_kernel0(void *kernel_base, const KernelParams *params)
     start(params);
 }
 
-static void serial_print_mem(const void *mem, int n) {
-    const char *memc = (const char *) mem;
-    for(int i = 0; i < n; ++i) {
-        serial_print_hex(memc[i]);
-        serial_print(":");
-    }
-    serial_print("\r\n");
-}
-
 EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
     efi.ih = image_handle;
     efi.st = system_table;
@@ -172,6 +163,8 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
     params.efi_rts = efi.st->RuntimeServices;
 
     init_serial();
+    serial_print("> efi_main\r\n");
+    // for(;;);
 
     void *kernel_base = (void *) KERNEL_PA;
     const void *kernel0_img = (const void *) &_binary_kernel0_img_start;
@@ -186,6 +179,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
     exit_boot_services(map_key);
 
     memcpy(kernel_base, kernel0_img, kernel0_img_size);
+    serial_print(">> start_kernel0\r\n");
     start_kernel0(kernel_base, &params);
 
     return EFI_SUCCESS;
