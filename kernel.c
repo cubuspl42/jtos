@@ -46,7 +46,7 @@ static void crash() {
 void kernel_start1(KernelParams *_params)
 {
 	serial_print("> kernel_start1\r\n");
-	// KernelParams params = *_params;
+	KernelParams params = *_params;
 
 	// crash();
 
@@ -54,13 +54,13 @@ void kernel_start1(KernelParams *_params)
 	// serial_print("> kernel_start1\r\n");
 
 	// init_serial();
-	// console_init(&params.fb);
-	// console_print("### jtos 0.0.1 alpha ###\n");
+	console_init(&params.fb);
+	console_print("### jtos 0.0.1 alpha ###\n");
 
 	// enable_paging(&params.efi_mm, &params.fb);
 	// console_print("* enabled paging\n");
 
-	// print_time(params.efi_rts);
+	print_time(params.efi_rts);
 
 	for(;;);
 }

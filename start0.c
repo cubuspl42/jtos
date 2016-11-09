@@ -16,8 +16,8 @@ static void start_kernel1(char *kernel1_img_pa, const KernelParams *params)
 	// for(;;);
 	// serial_print(">> kernel1_img_va\r\n");
 	// KernelStart start = (KernelStart) kernel1_img_va;
-	// KernelStart start = (KernelStart) KERNEL_VIRTUAL_BASE;
-	KernelStart start = (KernelStart) 0xffff800000000080;
+	KernelStart start = (KernelStart) KERNEL_VIRTUAL_BASE;
+	// KernelStart start = (KernelStart) 0xffff800000000080;
 	SERIAL_DUMP_HEX(start);
 	// for(;;);
 	start(params);

@@ -289,8 +289,8 @@ void enable_paging(void *kernel_hh_pa, EfiMemoryMap *mm, Framebuffer *fb)
 {
 	map_region(KERNEL_PA, KERNEL_PA, 256);
 	map_region(KERNEL_VIRTUAL_BASE, (uint64_t) kernel_hh_pa, 256);
-	// map_efi_runtime(mm);
-	// map_framebuffer(fb);
+	map_efi_runtime(mm);
+	map_framebuffer(fb);
 	// print_pm(pml4, 4);
 	trigger_paging();
 }
