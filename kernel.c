@@ -2,6 +2,7 @@
 #include "common.h"
 #include "console.h"
 #include "efi.h"
+#include "idt.h"
 #include "paging.h"
 #include "serial.h"
 
@@ -43,6 +44,11 @@ static void crash() {
     f();
 }
 
+static inline void int21()
+{
+	__asm__("int $0x22");
+}
+
 void kernel_start1(KernelParams *_params)
 {
 	serial_print("> kernel_start1\r\n");
@@ -53,9 +59,13 @@ void kernel_start1(KernelParams *_params)
 	// for(;;);
 	// serial_print("> kernel_start1\r\n");
 
+	idt_init();
+
 	// init_serial();
 	console_init(&params.fb);
 	console_print("### jtos 0.0.1 alpha ###\n");
+
+	// int21();
 
 	// enable_paging(&params.efi_mm, &params.fb);
 	// console_print("* enabled paging\n");

@@ -23,6 +23,7 @@ CFLAGS-console.o	+= -mcmodel=large
 CFLAGS-start0.o		+= -mcmodel=large
 CFLAGS-serial.o		+= -mcmodel=large
 CFLAGS-kernel.o		+= -mcmodel=large
+CFLAGS-idt.o		+= -mcmodel=large
 LDFLAGS				= -nostdlib -znocombreloc
 LDFLAGS				+= $(LDFLAGS-$@)
 LDFLAGS-loader.so	+= -T $(EFI_LDS) -shared -Bsymbolic -L $(EFILIB) -L $(LIB) $(EFI_CRT_OBJS)
@@ -35,7 +36,7 @@ fontppm.o: font.ppm
 # head1.o: head1.s
 	# as -mcmodel=large -o $@ $^
 
-kernel1.elf.img: head1.o common.o kernel.o serial.o fontppm.o console.o
+kernel1.elf.img: head1.o common.o kernel.o serial.o fontppm.o console.o idt.o idt_s.o
 	ld -T kernel1.ld -o $@ $^
 
 kernel1.img: kernel1.elf.img
