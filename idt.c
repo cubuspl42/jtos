@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "common.h"
+#include "console.h"
 #include "kernel.h"
 #include "serial.h"
 #include "keyboard_map.h"
@@ -175,6 +176,7 @@ void keyboard_handler_main(void) {
 		// vidptr[current_loc++] = 0x07;
 
 		char buf[] = {keyboard_map[keycode], 0};
-		serial_print(buf);	
+		serial_print(buf);
+		console_print(buf);
 	}
 }
