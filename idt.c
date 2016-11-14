@@ -13,23 +13,13 @@
 
 extern void keyboard_handler(void);
 
-struct IDTDescr{
-   uint16_t offset_1; // offset bits 0..15
-   uint16_t selector; // a code segment selector in GDT or LDT
-   uint8_t ist;       // bits 0..2 holds Interrupt Stack Table offset, rest of bits zero.
-   uint8_t type_attr; // type and attributes
-   uint16_t offset_2; // offset bits 16..31
-   uint32_t offset_3; // offset bits 32..63
-   uint32_t zero;     // reserved
-};
-
 struct IDT_entry {
 	uint16_t offset_lowerbits : 16;
 	uint16_t selector : 16;
 	uint8_t zero : 8;
 	uint8_t type_attr : 8;
 	uint64_t offset_higherbits : 48;
-	uint32_t zero_2 : 32; // reserved
+	uint32_t zero_2 : 32;
 } PACKED;
 
 _Static_assert(sizeof(struct IDT_entry) == 16, "wrong size of IDT_entry structure");
@@ -104,10 +94,10 @@ void idt_init(void)
 	}
 #endif
 
-	/*     Ports
-	*	 PIC1	PIC2
-	*Command 0x20	0xA0
-	*Data	 0x21	0xA1
+	/*
+	*          PIC1   PIC2
+	*  Command 0x20   0xA0
+	*  Data    0x21   0xA1
 	*/
 
 	/* ICW1 - begin initialization */
@@ -116,8 +106,7 @@ void idt_init(void)
 
 	/* ICW2 - remap offset address of IDT */
 	/*
-	* In x86 protected mode, we have to remap the PICs beyond 0x20 because
-	* Intel have designated the first 32 interrupts as "reserved" for cpu exceptions
+	* remap the PICs beyond 0x20
 	*/
 	write_port(0x21 , 0x20);
 	write_port(0xA1 , 0x28);
@@ -135,17 +124,10 @@ void idt_init(void)
 	write_port(0x21 , 0xff);
 	write_port(0xA1 , 0xff);
 
-	/* fill the IDT descriptor */
-
-	// idt_address = (uint64_t)IDT ;
-	// idt_ptr[0] = (sizeof (struct IDT_entry) * IDT_SIZE) + ((idt_address & 0xffff) << 16);
-	// idt_ptr[1] = idt_address >> 16 ;
-
 	IDTR idtr;
 	idtr.limit = (sizeof (struct IDT_entry) * IDT_SIZE) - 1;
 	idtr.offset = (uint64_t) IDT;
 
-	// idtr.offset = 0xbaadf00d;
 	load_idt(&idtr);
 	print_idtr(&idtr);
 
@@ -164,16 +146,11 @@ void keyboard_handler_main(void) {
 	/* write EOI */
 	write_port(0x20, 0x20);
 
-	// return;
-
 	status = read_port(KEYBOARD_STATUS_PORT);
-	/* Lowest bit of status will be set if buffer is not empty */
 	if (status & 0x01) {
 		keycode = read_port(KEYBOARD_DATA_PORT);
 		if(keycode < 0)
 			return;
-		// vidptr[current_loc++] = keyboard_map[keycode];
-		// vidptr[current_loc++] = 0x07;
 
 		char buf[] = {keyboard_map[keycode], 0};
 		serial_print(buf);

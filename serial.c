@@ -1,3 +1,4 @@
+/* Copyright (c) gitlab.com/nagisa */
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -56,7 +57,6 @@ int init_serial()
 {
     return init_serial_port();
 }
-
 
 static inline uint8_t port_inb(uint16_t port)
 {

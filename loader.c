@@ -1,5 +1,4 @@
 #include "efi.h"
-#include "gfx.h"
 #include "kernel.h"
 #include "serial.h"
 
@@ -142,12 +141,6 @@ static void print_memory_map(void)
     PrintStatus(status);
 }
 
-static void crash() {
-    typedef void (*F)(void);
-    F f = (F) 0x0;
-    f();
-}
-
 static void start_kernel0(void *kernel_base, const KernelParams *params)
 {
     KernelStart start = (KernelStart) kernel_base;
@@ -162,17 +155,12 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table) {
     KernelParams params;
     params.efi_rts = efi.st->RuntimeServices;
 
-    init_serial();
-    serial_print("> efi_main\r\n");
-    // for(;;);
-
     void *kernel_base = (void *) KERNEL_PA;
     const void *kernel0_img = (const void *) &_binary_kernel0_img_start;
     size_t kernel0_img_size = ((size_t) &_binary_kernel0_img_end) - ((size_t) kernel0_img);
 
+    init_serial();
     init_gnu_efi();
-
-    // print_memory_map();
 
     init_graphics(&params.fb);
     get_memory_map(&params.efi_mm, &map_key);
