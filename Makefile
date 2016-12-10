@@ -33,9 +33,6 @@ all: disk.img
 fontppm.o: font.ppm
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-# head1.o: head1.s
-	# as -mcmodel=large -o $@ $^
-
 kernel1.elf.img: head1.o common.o kernel.o serial.o fontppm.o console.o idt.o idt_s.o
 	ld -T kernel1.ld -o $@ $^
 
@@ -64,14 +61,6 @@ loader.so: efi.o loader.o serial-loader.o kernel0img.o
 	objcopy -j .text -j .sdata -j .data -j .dynamic \
 		-j .dynsym  -j .rel -j .rela -j .reloc \
 		--target=efi-app-$(ARCH) $^ $@
-
-hda:
-	mkdir -p hda/EFI/BOOT
-
-copy: loader.efi hda
-	cp loader.efi hda/EFI/BOOT/BOOTx64.EFI
-	# cp loader.efi hda/a.efi
-	# cp loader.efi hda/EFI/BOOT/a.efi
 
 disk.img: loader.efi
 	dd if=/dev/zero of=$@ bs=1k count=1440
