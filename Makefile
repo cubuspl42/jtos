@@ -84,7 +84,7 @@ OVMF.fd:
 	cp /usr/share/ovmf/OVMF.fd .
 
 run-qemu: disk.img OVMF.fd
-	qemu-system-x86_64 -net none -bios ./OVMF.fd -drive file=disk.img,format=raw -s -no-reboot
+	./run.sh
 
 clean:
 	rm -f *.efi *.o *.so *.img

@@ -1,0 +1,1 @@
+qemu-system-x86_64 -net none -bios ./OVMF.fd -drive file=disk.img,format=raw -s -no-reboot
