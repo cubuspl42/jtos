@@ -57,7 +57,7 @@ kernel0.img: kernel0.elf.img
 kernel0img.o: kernel0.img
 	objcopy -I binary -O elf64-x86-64 -B i386 $^ $@
 
-loader.so: efi.o gfx.o loader.o serial-loader.o kernel0img.o
+loader.so: efi.o loader.o serial-loader.o kernel0img.o
 	ld $(LDFLAGS) $^ -o $@ -lefi -lgnuefi
 
 %.efi: %.so
