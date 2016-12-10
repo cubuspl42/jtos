@@ -50,5 +50,7 @@ void kernel_start1(KernelParams *_params)
 
 	print_time(params.efi_rts);
 
+	console_print("* Entering echo mode...\n");
+
 	for(;;);
 }
