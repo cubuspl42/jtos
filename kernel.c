@@ -38,37 +38,15 @@ static void print_time(EFI_RUNTIME_SERVICES *rts)
 	}
 }
 
-static void crash() {
-    typedef void (*F)(void);
-    F f = (F) 0x0;
-    f();
-}
-
-static inline void int21()
-{
-	__asm__("int $0x22");
-}
-
 void kernel_start1(KernelParams *_params)
 {
 	serial_print("> kernel_start1\r\n");
 	KernelParams params = *_params;
 
-	// crash();
-
-	// for(;;);
-	// serial_print("> kernel_start1\r\n");
-
 	idt_init();
 
-	// init_serial();
 	console_init(&params.fb);
 	console_print("### jtos 0.0.1 alpha ###\n");
-
-	// int21();
-
-	// enable_paging(&params.efi_mm, &params.fb);
-	// console_print("* enabled paging\n");
 
 	print_time(params.efi_rts);
 
