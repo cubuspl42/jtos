@@ -10,32 +10,6 @@ static void start_kernel1(const KernelParams *params)
 	start(params);
 }
 
-static inline uint64_t read_cr0()
-{
-	uint64_t value;
-	__asm__("movq %%cr0, %0" : "=r"(value));
-	return value;
-}
-
-static inline uint64_t read_cr4()
-{
-	uint64_t value;
-	__asm__("movq %%cr4, %0" : "=r"(value));
-	return value;
-}
-
-const uint32_t IA32_EFER_MSR = 0xC0000080;
-
-static uint64_t cpu_read_msr(uint32_t msr) {
-    uint32_t a, d;
-    __asm__ volatile("rdmsr" : "=a"(a), "=d"(d) : "c"(msr));
-    return ((uint64_t)d) << 32 | a;
-}
-
-static uint64_t read_efer() {
-    return cpu_read_msr(IA32_EFER_MSR);
-}
-
 void kernel_start0(KernelParams *_params)
 {
 	serial_print("> kernel_start0\r\n");
