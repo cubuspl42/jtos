@@ -80,8 +80,11 @@ disk.img: loader.efi
 	mmd -i $@ ::/EFI/BOOT
 	mcopy -i $@ $^ ::/EFI/BOOT/BOOTx64.EFI
 
-run-qemu: disk.img
-	qemu-system-x86_64 -net none -bios /usr/share/ovmf/OVMF.fd -drive file=$^,format=raw -s -no-reboot
+OVMF.fd:
+	cp /usr/share/ovmf/OVMF.fd .
+
+run-qemu: disk.img OVMF.fd
+	qemu-system-x86_64 -net none -bios ./OVMF.fd -drive file=disk.img,format=raw -s -no-reboot
 
 clean:
 	rm -f *.efi *.o *.so *.img
