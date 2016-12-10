@@ -2,8 +2,8 @@
 #include <efi.h>
 #include "framebuffer.h"
 
-#define KERNEL_PA 0x100000 // 1MiB
-#define KERNEL_VIRTUAL_BASE 0xffff800000000000
+#define KERNEL_PA 0x100000 // 1MiB; sync with kernel0.ld
+#define KERNEL_VIRTUAL_BASE 0xffff800000000000 // sync with kernel1.ld
 #define EFI_VIRTUAL_BASE (KERNEL_VIRTUAL_BASE + 0x40000000)
 #define FRAMEBUFFER_VIRTUAL_BASE (EFI_VIRTUAL_BASE + 0x40000000)
 
