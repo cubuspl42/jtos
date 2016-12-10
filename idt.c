@@ -82,61 +82,46 @@ static void print_idtr(IDTR *idtr)
 	}
 }
 
+#define PIC1_CMD 0x20
+#define PIC1_DATA 0x21
+#define PIC2_CMD 0xA0
+#define PIC2_DATA 0xA1
+#define IRQ1 0x21
+#define ICW1 0x11
+#define EOI 0x20
+
 void idt_init(void)
 {
-	uint64_t keyboard_address;
-	uint64_t idt_address;
-	uint64_t idt_ptr[2];
-
-#if 1
-	for(int i = 0; i < IDT_SIZE; ++i) {
-		idte_init(&IDT[i]);
-	}
-#endif
-
-	/*
-	*          PIC1   PIC2
-	*  Command 0x20   0xA0
-	*  Data    0x21   0xA1
-	*/
+	idte_init(&IDT[IRQ1]);
 
 	/* ICW1 - begin initialization */
-	write_port(0x20 , 0x11);
-	write_port(0xA0 , 0x11);
+	write_port(PIC1_CMD, ICW1);
+	write_port(PIC2_CMD, ICW1);
 
 	/* ICW2 - remap offset address of IDT */
-	/*
-	* remap the PICs beyond 0x20
-	*/
-	write_port(0x21 , 0x20);
-	write_port(0xA1 , 0x28);
+	write_port(PIC1_DATA, 0x20);
+	write_port(PIC2_DATA, 0x28);
 
 	/* ICW3 - setup cascading */
-	write_port(0x21 , 0x00);  
-	write_port(0xA1 , 0x00);  
+	write_port(PIC1_DATA, 0x00);  
+	write_port(PIC2_DATA, 0x00);  
 
 	/* ICW4 - environment info */
-	write_port(0x21 , 0x01);
-	write_port(0xA1 , 0x01);
-	/* Initialization finished */
+	write_port(PIC1_DATA, 0x01);
+	write_port(PIC2_DATA, 0x01);
 
-	/* mask interrupts */
-	write_port(0x21 , 0xff);
-	write_port(0xA1 , 0xff);
+	/* mask all interrupts */
+	write_port(PIC1_DATA, 0xff);
+	write_port(PIC2_DATA, 0xff);
 
 	IDTR idtr;
 	idtr.limit = (sizeof (struct IDT_entry) * IDT_SIZE) - 1;
 	idtr.offset = (uint64_t) IDT;
 
 	load_idt(&idtr);
-	print_idtr(&idtr);
-
-	IDTR idtr2 = {0, 0};
-	store_idt(&idtr2);
-	print_idtr(&idtr2);
 
 	/* 0xFD is 11111101 - enables only IRQ1 (keyboard)*/
-	write_port(0x21 , 0xFD);
+	write_port(IRQ1, 0xFD);
 }
 
 void keyboard_handler_main(void) {
@@ -144,7 +129,7 @@ void keyboard_handler_main(void) {
 	char keycode;
 
 	/* write EOI */
-	write_port(0x20, 0x20);
+	write_port(PIC1_CMD, EOI);
 
 	status = read_port(KEYBOARD_STATUS_PORT);
 	if (status & 0x01) {
