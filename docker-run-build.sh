@@ -1,0 +1,1 @@
+docker run -v `pwd`:/src:ro -v `pwd`:/out cubuspl42/jtos-build bash ./build.sh

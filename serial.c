@@ -37,14 +37,6 @@
 #define   B_UART_MSR_RI       (1 << 7)
 #define   B_UART_MSR_DCD      (1 << 8)
 
-void *memset(void *dest, int e, unsigned long len) {
-    uint8_t *d = dest;
-    for(uint64_t i = 0; i < len; i++, d++) {
-        *d = e;
-    }
-    return dest;
-}
-
 uint64_t kstrlen(const char *data) {
     uint64_t r;
     for(r = 0; *data != 0; data++, r++);

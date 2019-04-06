@@ -1,0 +1,1 @@
+docker build --tag=cubuspl42/jtos-build .

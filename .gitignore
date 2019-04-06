@@ -6,3 +6,4 @@
 *.swp
 OVMF.fd
 hda/
+.vscode/

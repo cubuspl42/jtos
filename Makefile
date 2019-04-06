@@ -4,12 +4,11 @@ TARGET			= loader.efi
 
 KERNEL_OBJS		= kernel.o
 
-EFIINC			= /usr/local/include/efi
+EFIINC			= /usr/include/efi
 EFIINCS			= -I$(EFIINC) -I$(EFIINC)/$(ARCH) -I$(EFIINC)/protocol
 LIB				= /usr/lib
-EFILIB			= /usr/local/lib
-EFI_CRT_OBJS	= $(EFILIB)/crt0-efi-$(ARCH).o
-EFI_LDS			= $(EFILIB)/elf_$(ARCH)_efi.lds
+EFI_CRT_OBJS	= $(LIB)/crt0-efi-$(ARCH).o
+EFI_LDS			= $(LIB)/elf_$(ARCH)_efi.lds
 CC				= /usr/bin/clang
 
 CFLAGS			=	-O0 -xc -std=gnu11 -fno-stack-protector -fshort-wchar -mno-red-zone -Wall -Wextra -pedantic-errors \
@@ -26,7 +25,7 @@ CFLAGS-kernel.o		+= -mcmodel=large
 CFLAGS-idt.o		+= -mcmodel=large
 LDFLAGS				= -nostdlib -znocombreloc
 LDFLAGS				+= $(LDFLAGS-$@)
-LDFLAGS-loader.so	+= -T $(EFI_LDS) -shared -Bsymbolic -L $(EFILIB) -L $(LIB) $(EFI_CRT_OBJS)
+LDFLAGS-loader.so	+= -T $(EFI_LDS) -shared -Bsymbolic -L $(LIB) $(EFI_CRT_OBJS)
 
 all: disk.img
 
